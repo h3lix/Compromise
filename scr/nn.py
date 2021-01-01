@@ -98,11 +98,12 @@ class NeuralNetwork:
         return previous_output
 
 
-# X is usually used to denote the input data to a network
-X = [[1.0, 2.0, 3.0, 2.5],
-     [2.0, 5.0, -1.0, 2.0],
-     [-1.5, 2.7, 3.3, -0.8]]
+if __name__ == "__main__":
+    # X is usually used to denote the input data to a network
+    X = [[1.0, 2.0, 3.0, 2.5],
+        [2.0, 5.0, -1.0, 2.0],
+        [-1.5, 2.7, 3.3, -0.8]]
 
-nn = NeuralNetwork([4,4,4,3])
+    nn = NeuralNetwork([4,4,4,4])
 
-print(nn.forward(X))
+    print(nn.forward(X))
