@@ -4,6 +4,9 @@ This is a project for the Data Science, Algorithms and Complexity module at the 
 This library contains some basic structures:
     Layer - A single layer within a larger NN
     NeuralNetwork - The NN as a whole, made up of many Layers
+
+The code from Neural Networks from Scratch (NNFS) part 6 was used as a base to build further from:
+https://www.youtube.com/watch?v=omz_NdFgWyU
 """
 
 import numpy as np
@@ -67,13 +70,14 @@ class NeuralNetwork:
                 shape (list): The shape of the neural network e.g. [2,4,3]
                     [2,4,3] will create a three layer network with 2 input nodes, 4 nodes in the hidden layer and 3 output nodes.
                     The shape should be of at least length 2 otherwise only input nodes will be created
-                activation_func (function): The activation function to use throughout the whole network
+                hidden_activation (function): The activation function to use throughout the hidden layers
                     default: relu
-                output_activation_func (function): The activation function to use for the output layer
+                output_activation (function): The activation function to use for the output layer
                     default: softmax
             Returns:
                 None
         """
+        self.shape = shape
         self.layers = []
         for inputs, neurons in zip(shape, shape[1:]):
             self.layers.append(Layer(inputs, neurons, hidden_activation))
@@ -97,6 +101,24 @@ class NeuralNetwork:
             previous_output = layer.forward(previous_output)
         return previous_output
 
+    def get_weights(self):
+        flattened_weights = np.array([])
+        for layer in self.layers:
+            flattened_weights = np.append(flattened_weights, layer.weights.flatten())
+        return flattened_weights
+
+    def set_weights(self, weights):
+        len_expected = len(self.get_weights())
+        if len(weights) != len_expected:
+            print("Input weights do not match expected length")
+            return
+
+        index = 0
+        for layer in self.layers:
+            shape = layer.weights.shape
+            size = np.product(shape)
+            layer.weights = weights[index:index+size].reshape(shape)
+            index += size
 
 if __name__ == "__main__":
     # X is usually used to denote the input data to a network

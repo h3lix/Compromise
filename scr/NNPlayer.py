@@ -19,9 +19,10 @@ class NNPlayer(cg.AbstractPlayer):
             self.fitness += 5
 
 class GeneticAlgorithm:
-    def __init__(self, population_size=10, num_of_games=12):
+    def __init__(self, population_size=10, num_of_games=12, mutation_rate=0.01):
         self.population = [NNPlayer() for _ in range(population_size)]
         self.games = [cg.CompromiseGame(cg.RandomPlayer(), cg.RandomPlayer(), 30, 10) for _ in range(num_of_games)]
+        self.mutation_rate = mutation_rate
 
     def play_random(self):
         random.shuffle(self.population)
@@ -55,10 +56,37 @@ class GeneticAlgorithm:
         norm_fitnesses = fitnesses / sum(fitnesses)
         return np.random.choice(self.population, len(self.population)//2, replace=False, p=norm_fitnesses)
 
+    def crossover(self, parent_a, parent_b):
+        pa_weights = parent_a.brain.get_weights()
+        pb_weights = parent_b.brain.get_weights()
+        shape = parent_a.brain.shape
+
+        split = random.randint(0, len(pa_weights)-1)
+
+        child1_weights = np.append(pa_weights[:split,], pb_weights[split:,])
+        child2_weights = np.append(pb_weights[:split,], pa_weights[split:,])
+
+        self.mutate(child1_weights)
+        self.mutate(child2_weights)
+
+        child1 = nn.NeuralNetwork(shape)
+        child1.set_weights(child1_weights)
+
+        child2 = nn.NeuralNetwork(shape)
+        child2.set_weights(child2_weights)
+
+    def mutate(self, weights):
+        # Mask code found here: https://stackoverflow.com/questions/31389481/numpy-replace-random-elements-in-an-array
+        mask = np.random.choice([0, 1], size=weights.shape, p=((1 - self.mutation_rate), self.mutation_rate)).astype(np.bool)
+        random_weights = 0.1 * np.random.randn(*weights.shape)
+        weights[mask] = random_weights[mask]
+        return weights
+
 if __name__ == "__main__":
     ga = GeneticAlgorithm(20)
     ga.play_random()
     parents = ga.choose_parents()
+    ga.crossover(parents[0], parents[1])
 
     for parent in parents:
         print(parent, parent.fitness)
