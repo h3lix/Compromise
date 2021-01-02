@@ -59,7 +59,7 @@ class Layer:
 class NeuralNetwork:
     """A neural network, built from many layers to solve some problem
     """
-    def __init__(self, shape, activation_func=relu, output_activation_func=softmax):
+    def __init__(self, shape, hidden_activation=relu, output_activation=softmax):
         """
         Initialises a neural network
 
@@ -76,10 +76,10 @@ class NeuralNetwork:
         """
         self.layers = []
         for inputs, neurons in zip(shape, shape[1:]):
-            self.layers.append(Layer(inputs, neurons, activation_func))
+            self.layers.append(Layer(inputs, neurons, hidden_activation))
 
-        if output_activation_func is not None:
-            self.layers[-1].set_activation(output_activation_func)
+        if output_activation is not None:
+            self.layers[-1].set_activation(output_activation)
 
     def forward(self, inputs):
         """
