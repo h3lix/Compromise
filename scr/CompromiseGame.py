@@ -312,7 +312,7 @@ class CompromiseGame:
             raise Exception("Green Player is not of valid type: " + str(type(playerA)))
         if not (isinstance(playerB, AbstractPlayer)):
             raise Exception("Red Player is not of valid type: " + str(type(playerB)))
-        self.redPlayer = playerA
+        self.redPlayer = playerA 
         self.greenPlayer = playerB
         self.resetGame()
 
