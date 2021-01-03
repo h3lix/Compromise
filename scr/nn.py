@@ -59,6 +59,7 @@ class Layer:
         """
         return self.activate(np.dot(inputs, self.weights) + self.biases)
 
+
 class NeuralNetwork:
     """A neural network, built from many layers to solve some problem
     """
@@ -118,6 +119,25 @@ class NeuralNetwork:
             shape = layer.weights.shape
             size = np.product(shape)
             layer.weights = weights[index:index+size].reshape(shape)
+            index += size
+
+    def get_biases(self):
+        flattened_biases = np.array([])
+        for layer in self.layers:
+            flattened_biases = np.append(flattened_biases, layer.biases.flatten())
+        return flattened_biases
+
+    def set_biases(self, biases):
+        len_expected = len(self.get_biases())
+        if len(biases) != len_expected:
+            print("Input biases do not match expected length")
+            return
+
+        index = 0
+        for layer in self.layers:
+            shape = layer.biases.shape
+            size = np.product(shape)
+            layer.biases = biases[index:index+size].reshape(shape)
             index += size
 
 if __name__ == "__main__":
