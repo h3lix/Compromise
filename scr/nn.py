@@ -140,6 +140,14 @@ class NeuralNetwork:
             layer.biases = biases[index:index+size].reshape(shape)
             index += size
 
+    def save(self, filename):
+        np.savez(filename, weights=self.get_weights(), biases=self.get_biases())
+
+    def load(self, filename):
+        with np.load(filename) as model:
+            self.set_weights(model['weights'])
+            self.set_biases(model['biases'])
+
 if __name__ == "__main__":
     # X is usually used to denote the input data to a network
     X = [[1.0, 2.0, 3.0, 2.5],

@@ -1,130 +1,123 @@
 import numpy as np
 import nn as nn
+import ga as ga
 import CompromiseGame as cg
 import random
 
 class NNPlayer(cg.AbstractPlayer):
-    def __init__(self, shape=[58,32,32,32,3]):
-        self.brain = nn.NeuralNetwork(shape, output_activation=nn.sigmoid)
+    
+    possible_moves = [[0, 0, 0], [0, 0, 1], [0, 0, 2], [0, 1, 0], [0, 1, 1], [0, 1, 2], [0, 2, 0], [0, 2, 1], [0, 2, 2], [1, 0, 0], [1, 0, 1], [1, 0, 2], [1, 1, 0], [1, 1, 1], [1, 1, 2], [1, 2, 0], [1, 2, 1], [1, 2, 2], [2, 0, 0], [2, 0, 1], [2, 0, 2], [2, 1, 0], [2, 1, 1], [2, 1, 2], [2, 2, 0], [2, 2, 1], [2, 2, 2]]
+    
+    def __init__(self, shape=[54,32,32,32,27], output_activation=nn.softmax):
+        self.shape = shape
+        self.output_activation = output_activation
+        self.brain = nn.NeuralNetwork(shape, output_activation=output_activation)
         self.fitness = 0
+        self.games_won = 0
+        self.scores = []
+
+    def copy(self):
+        obj = NNPlayer(self.shape, self.output_activation)
+        obj.brain.set_weights(self.brain.get_weights())
+        obj.brain.set_biases(self.brain.get_biases())
+        return obj
 
     def play(self, my_state, opp_state, my_score, opp_score, turn, length, num_pips):
         nn_inputs = list(np.array(my_state).flatten()) + list(np.array(opp_state).flatten())
-        nn_inputs.extend((my_score, opp_score, turn, length))
-        return np.floor(self.brain.forward(nn_inputs) * 3).tolist()[0]
-
-
-class GeneticAlgorithm:
-    def __init__(self, population_size=10, num_of_games=12, mutation_rate=0.01):
-        self.population = [NNPlayer() for _ in range(population_size)]
-        self.games = [cg.CompromiseGame(cg.RandomPlayer(), cg.RandomPlayer(), 30, 10) for _ in range(num_of_games)]
-        self.mutation_rate = mutation_rate
-        self.max_fitness = -99999
-        self.avg_fitness = 0
-
-    def do_many_generations(self, num_of_generations):
-        for i in range(num_of_generations):
-            print(f"Generation: {i}, Avg Fitness: {self.avg_fitness/len(self.population)}, Max Fitness: {self.max_fitness}")
-            self.max_fitness = -99999
-            self.avg_fitness = 0
-            self.do_generation()
-
-    def do_generation(self):
-        random.shuffle(self.population)
-
-        self.play_greedy()
-
-        self.population = self.choose_parents()
-        random.shuffle(self.population)
-        children = self.crossover(self.population, len(self.population))
-
-        self.population += children
-
-    def play_game(self):
-        for player_a, player_b in zip(*[iter(self.population)]*2): # *[iter(s)*n] explanation here: https://www.reddit.com/r/learnpython/comments/bpsyjt/how_to_i_iterate_through_a_list_two_at_a_time/enxda01/
-            scores = []
-
-            for game in self.games:
-                game.newPlayers(player_a, player_b)
-                scores.append(game.play())
-
-            player_a.fitness, player_b.fitness = self.calculate_fitness(scores)
-
-    def play_greedy(self):
-        for player in self.population:
-            scores = []
-
-            for game in self.games:
-                game.newPlayers(player, cg.SmartGreedyPlayer())
-                score = game.play()
-                #if score[0] > score[1]:
-                    #print(score)
-                scores.append(score)
-
-            player.fitness = self.calculate_fitness(scores)
-            #print(player.fitness)
+        #nn_inputs.extend((my_score, opp_score, turn, length))
+        return self.possible_moves[np.argmax(self.brain.forward(nn_inputs))]
 
     def _fitness_func(self, my_score, opp_score):
         change = my_score - opp_score
         if my_score > opp_score:
-            change += 20
+            self.games_won += 1
+            return change + 10
         return change
 
-    def calculate_fitness(self, scores):
-        pA_fitness = 0
-        #pB_fitness = 0
-        for score in scores:
-            pA_fitness += self._fitness_func(score[0], score[1])
-            #pB_fitness += self._fitness_func(score[1], score[0])
-        if pA_fitness > self.max_fitness:
-            self.max_fitness = pA_fitness
-        self.avg_fitness += pA_fitness
-        #if pB_fitness > self.max_fitness:
-        #    self.max_fitness = pB_fitness
-        return pA_fitness#, pB_fitness
+    def calc_fitness(self):
+        self.games_won = 0
+        self.fitness = 0
 
-    def _get_normalised_fitnesses(self, population):
-        fitnesses = np.exp(np.array([p.fitness for p in population]))
-        return fitnesses / np.sum(fitnesses)
+        for score in self.scores:
+            for game in score:
+                self.fitness += self._fitness_func(game[0], game[1])
+        return self.fitness/len(self.scores)
 
-    def choose_parents(self):
-        norm_fitnesses = self._get_normalised_fitnesses(self.population)
-        return list(np.random.choice(self.population, size=len(self.population)//2, replace=False, p=norm_fitnesses))
-
-    def crossover(self, parents, num_of_children):
-        children = []
-        for _ in range(num_of_children):
-            parent_a, parent_b = np.random.choice(parents, size=2, replace=False, p=self._get_normalised_fitnesses(self.population))
+    def add_score(self, score):
+        self.scores.append(score)
         
-            pa_weights = parent_a.brain.get_weights()
-            pb_weights = parent_b.brain.get_weights()
+def self_play(population, num_games, num_opponents):
+    game = cg.CompromiseGame(cg.RandomPlayer(), cg.RandomPlayer(), 30, 10)
+    for _ in range(num_opponents):
+        random.shuffle(population)
+        for player_a, player_b in zip(*[iter(population)]*2):
+            scores = []
 
-            pa_biases = parent_a.brain.get_biases()
-            pb_biases = parent_b.brain.get_biases()
+            game.newPlayers(player_a, player_b)
 
-            shape = parent_a.brain.shape
+            for g in range(num_games):
+                game.resetGame()
+                scores.append(game.play())
 
-            weight_split = random.randint(0, len(pa_weights)-1)
-            biases_split = random.randint(0, len(pa_biases)-1)
+            player_a.add_score(scores)
+            player_b.add_score(np.flip(scores))
 
-            child_weights = self.mutate(np.append(pa_weights[:weight_split,], pb_weights[weight_split:,]))
-            child_biases = self.mutate(np.append(pa_biases[:biases_split,], pb_biases[biases_split:,]))
+    for player in population:
+        player.calc_fitness()
 
-            child = NNPlayer(shape)
-            child.brain.set_weights(child_weights)
-            child.brain.set_biases(child_biases)
+    return population
 
-            children.append(child)
+def play_against(population, opponent, num_games):
+    game = cg.CompromiseGame(cg.RandomPlayer(), cg.RandomPlayer(), 30, 10)
+    for player in population:
+        scores = []
 
-        return children
+        game.newPlayers(player, opponent)
 
-    def mutate(self, weights):
-        # Mask code found here: https://stackoverflow.com/questions/31389481/numpy-replace-random-elements-in-an-array
-        mask = np.random.choice([0, 1], size=weights.shape, p=((1 - self.mutation_rate), self.mutation_rate)).astype(np.bool)
-        random_weights = 0.3 * np.random.randn(*weights.shape)
-        weights[mask] *= random_weights[mask]
-        return weights
+        for g in range(num_games):
+            game.resetGame()
+            scores.append(game.play())
+
+        player.calc_fitness(scores)
+
+    return population
 
 if __name__ == "__main__":
-    ga = GeneticAlgorithm(200, 12)
-    ga.do_many_generations(1000)
+    generations = 100
+    population_size = 100
+    num_games = 11
+    num_opponents = 10
+    mutation_rate = 0.05
+
+    population = ga.generate_population(population_size, NNPlayer)
+
+    game = cg.CompromiseGame(cg.RandomPlayer(), cg.RandomPlayer(), 30, 10)
+    sgp = cg.RandomPlayer()
+    
+    for gen in range(generations):
+
+        random.shuffle(population)
+
+        population = self_play(population, num_games, num_opponents)
+        population = sorted(population, key=lambda player: player.fitness, reverse=True)
+
+        avg_fitness = 0
+        avg_games = 0
+
+        for player in population:
+            avg_fitness += player.fitness
+            avg_games += player.games_won
+            player.scores = []
+
+        avg_fitness = avg_fitness/len(population)
+        avg_games = (avg_games/len(population))/num_opponents
+        
+        print(f"Generation: {gen}, Avg Fitness: {avg_fitness}, Avg Games Won: {avg_games}, Max Fitness: {population[0].fitness}, Max Games Won: {population[0].games_won}")
+
+        parents = ga.select_mating_pool(population, len(population)//5)
+        children = ga.crossover(parents, population_size-len(parents), mutation_rate)
+
+        population = np.append(parents, children)
+
+    population = sorted(population, key=lambda player: player.fitness, reverse=True)
+    population[0].brain.save("best-model.npz")
