@@ -1,8 +1,10 @@
+import CompromiseGame as cg
 import numpy as np
 import nn as nn
 import ga as ga
-import CompromiseGame as cg
 import random
+import multiprocessing
+import itertools
 
 class NNPlayer(cg.AbstractPlayer):
     
@@ -45,72 +47,80 @@ class NNPlayer(cg.AbstractPlayer):
 
     def add_score(self, score):
         self.scores.append(score)
+
+def play_game(player_a, player_b, num_games=25):
+    game = cg.CompromiseGame(player_a, player_b, 30, 10)
+    scores = []
+
+    for _ in range(num_games):
+        game.resetGame()
+        scores.append(game.play())
+
+    player_a.add_score(scores)
+
+    if isinstance(player_b, NNPlayer):
+        player_b.add_score(np.flip(scores).tolist())
+
+        return player_a, player_b
+    
+    return player_a
         
 def self_play(population, num_games, num_opponents):
-    game = cg.CompromiseGame(cg.RandomPlayer(), cg.RandomPlayer(), 30, 10)
-    for _ in range(num_opponents):
-        random.shuffle(population)
-        for player_a, player_b in zip(*[iter(population)]*2):
-            scores = []
-
-            game.newPlayers(player_a, player_b)
-
-            for g in range(num_games):
-                game.resetGame()
-                scores.append(game.play())
-
-            player_a.add_score(scores)
-            player_b.add_score(np.flip(scores))
-
-    for player in population:
-        player.calc_fitness()
+    with multiprocessing.Pool() as pool:
+        for _ in range(num_opponents):
+            random.shuffle(population)
+            
+            population = np.array(pool.starmap(play_game, zip(*[iter(population)]*2))).flatten()
 
     return population
 
-def play_against(population, opponent, num_games):
-    game = cg.CompromiseGame(cg.RandomPlayer(), cg.RandomPlayer(), 30, 10)
-    for player in population:
-        scores = []
+def play_against(population, opponent, num_games, num_opponents):
+    #arguments = map(lambda player: (player, opponent, num_games), population)
+    #print(*arguments)
+    with multiprocessing.Pool() as pool:
+        for _ in range(num_opponents):
+            arguments = map(lambda player: (player, opponent, num_games), population)
 
-        game.newPlayers(player, opponent)
+            population = np.array(pool.starmap(play_game, arguments)).flatten()
 
-        for g in range(num_games):
-            game.resetGame()
-            scores.append(game.play())
+    #game = cg.CompromiseGame(cg.RandomPlayer(), cg.RandomPlayer(), 30, 10)
+    #for player in population:
+    #    scores = play_game(player, opponent, num_games)
 
-        player.calc_fitness(scores)
+    #    player.add_score(scores)
 
     return population
 
 if __name__ == "__main__":
-    generations = 100
+    generations = 10000
     population_size = 100
-    num_games = 11
-    num_opponents = 10
-    mutation_rate = 0.05
+    num_games = 25
+    num_opponents = 3
+    mutation_rate = 0.01
 
     population = ga.generate_population(population_size, NNPlayer)
 
-    game = cg.CompromiseGame(cg.RandomPlayer(), cg.RandomPlayer(), 30, 10)
-    sgp = cg.RandomPlayer()
+    #game = cg.CompromiseGame(cg.RandomPlayer(), cg.RandomPlayer(), 30, 10)
+    #sgp = cg.RandomPlayer()
     
     for gen in range(generations):
-
-        random.shuffle(population)
-
-        population = self_play(population, num_games, num_opponents)
-        population = sorted(population, key=lambda player: player.fitness, reverse=True)
-
         avg_fitness = 0
         avg_games = 0
 
+        random.shuffle(population)
+
+        population = play_against(population, cg.RandomPlayer(), num_games, num_opponents)
+
         for player in population:
+            player.calc_fitness()
             avg_fitness += player.fitness
             avg_games += player.games_won
             player.scores = []
 
         avg_fitness = avg_fitness/len(population)
-        avg_games = (avg_games/len(population))/num_opponents
+        avg_games = avg_games/len(population)
+
+        population = sorted(population, key=lambda player: player.fitness, reverse=True)
         
         print(f"Generation: {gen}, Avg Fitness: {avg_fitness}, Avg Games Won: {avg_games}, Max Fitness: {population[0].fitness}, Max Games Won: {population[0].games_won}")
 
