@@ -19,7 +19,7 @@ class NNPlayer(cg.AbstractPlayer):
     
     possible_moves = [[0, 0, 0], [0, 0, 1], [0, 0, 2], [0, 1, 0], [0, 1, 1], [0, 1, 2], [0, 2, 0], [0, 2, 1], [0, 2, 2], [1, 0, 0], [1, 0, 1], [1, 0, 2], [1, 1, 0], [1, 1, 1], [1, 1, 2], [1, 2, 0], [1, 2, 1], [1, 2, 2], [2, 0, 0], [2, 0, 1], [2, 0, 2], [2, 1, 0], [2, 1, 1], [2, 1, 2], [2, 2, 0], [2, 2, 1], [2, 2, 2]]
     
-    def __init__(self, shape=[54,128,27], hidden_activation=nn.relu, output_activation=nn.softmax):
+    def __init__(self, shape=[54,64,64,27], hidden_activation=nn.relu, output_activation=nn.softmax):
         """
         Initialise a NNPlayer with a Neural Network brain
 
@@ -64,7 +64,7 @@ class NNPlayer(cg.AbstractPlayer):
             Returns:
                 move (list): The move that this player would like to take in the format [1,1,2]
         """
-        nn_inputs = list(np.array(my_state).flatten()) + list(np.array(opp_state).flatten())
+        nn_inputs = list(np.array(my_state).flatten()/3) + list(np.array(opp_state).flatten()/3)
         #nn_inputs.extend((my_score, opp_score, turn, length))
         return self.possible_moves[np.argmax(self.brain.forward(nn_inputs))]
 
@@ -82,7 +82,7 @@ class NNPlayer(cg.AbstractPlayer):
         change = my_score - opp_score
         if my_score > opp_score:
             self.games_won += 1
-        return change
+        return change / 2
 
     def calc_fitness(self):
         """
@@ -99,10 +99,12 @@ class NNPlayer(cg.AbstractPlayer):
         for score in self.scores:
             for game in score:
                 self.fitness += self._fitness_func(game[0], game[1])
+
+        self.fitness = (self.fitness + (10 * self.games_won)) / len(self.scores)
         
         # The final fitness is the sum of all differences through all games, plus 10 * number of games won
         # divided by the number of opponents played (len(self.scores)) to get an average fitness
-        return (self.fitness + (10 * games_won)) / len(self.scores)
+        return self.fitness
 
     def add_score(self, score):
         """A method for appending a score to this player's scores
@@ -177,12 +179,12 @@ def play_against(population, opponent, num_games, num_opponents):
     return population
 
 if __name__ == "__main__":
-    generations = 10
-    population_size = 10
-    num_games = 11
-    num_opponents = 5
+    generations = 1000
+    population_size = 100
+    num_games = 25
+    num_opponents = 3
     mutation_rate = 0.05
-    mutation_delta = 0.1
+    mutation_delta = 0.5
 
     population = ga.generate_population(population_size, NNPlayer)
 
@@ -197,10 +199,10 @@ if __name__ == "__main__":
 
         random.shuffle(population)
 
-        if random.randint(0,100) <= 70:
-            population = self_play(population, num_games, num_opponents)
-        else:
-            population = play_against(population, random.choice(opponents), num_games, num_opponents)
+        #if random.randint(0,100) <= 70:
+        #    population = self_play(population, num_games, num_opponents)
+        #else:
+        population = play_against(population, cg.RandomPlayer(), num_games, num_opponents)
 
         for player in population:
             player.calc_fitness()
@@ -216,7 +218,7 @@ if __name__ == "__main__":
         print(f"Generation: {gen}, Avg Fitness: {avg_fitness}, Avg Games Won: {avg_games}, Max Fitness: {population[0].fitness}, Max Games Won: {population[0].games_won}")
 
         parents = ga.select_mating_pool(population, len(population)//2)
-        children = ga.crossover(parents, population_size-len(parents), mutation_rate, mutation_delta)
+        children = ga.intermediate_recombination(parents, population_size-len(parents), mutation_rate, mutation_delta)
 
         population = np.append(parents, children)
 
