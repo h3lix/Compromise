@@ -14,6 +14,6 @@ if __name__ == "__main__":
         score = game.play()
         if score[0] > score[1]:
             wins += 1
-        print(score)
+        #print(score)
 
     print(wins)

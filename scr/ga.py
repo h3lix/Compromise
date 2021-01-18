@@ -15,7 +15,7 @@ def select_mating_pool(population, num_parents):
     #fitnesses = get_normalised_fitnesses(population)
     #return np.random.choice(population, size=num_parents, replace=False, p=fitnesses)
 
-def crossover(parents, num_children, mutation_rate):
+def crossover(parents, num_children, mutation_rate, mutation_delta):
     children = []
     for _ in range(num_children):
         parent_a, parent_b = np.random.choice(parents, size=2, p=get_normalised_fitnesses(parents))
@@ -31,8 +31,8 @@ def crossover(parents, num_children, mutation_rate):
         weight_split = random.randint(0, len(pa_weights)-1)
         biases_split = random.randint(0, len(pa_biases)-1)
 
-        child_weights = mutate(np.append(pa_weights[:weight_split,], pb_weights[weight_split:,]), mutation_rate)
-        child_biases = mutate(np.append(pa_biases[:biases_split,], pb_biases[biases_split:,]), mutation_rate)
+        child_weights = mutate(np.append(pa_weights[:weight_split,], pb_weights[weight_split:,]), mutation_rate, mutation_delta)
+        child_biases = mutate(np.append(pa_biases[:biases_split,], pb_biases[biases_split:,]), mutation_rate, mutation_delta)
 
         child = parent_a.copy()
 
@@ -43,9 +43,9 @@ def crossover(parents, num_children, mutation_rate):
 
     return children
 
-def mutate(weights, mutation_rate):
+def mutate(weights, mutation_rate, mutation_delta):
     # Mask code found here: https://stackoverflow.com/questions/31389481/numpy-replace-random-elements-in-an-array
     mask = np.random.choice([0, 1], size=weights.shape, p=((1 - mutation_rate), mutation_rate)).astype(np.bool)
-    random_weights = 0.1 * np.random.randn(*weights.shape)
+    random_weights = mutation_delta * np.random.randn(*weights.shape)
     weights[mask] += random_weights[mask]
     return weights

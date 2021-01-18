@@ -10,7 +10,7 @@ class NNPlayer(cg.AbstractPlayer):
     
     possible_moves = [[0, 0, 0], [0, 0, 1], [0, 0, 2], [0, 1, 0], [0, 1, 1], [0, 1, 2], [0, 2, 0], [0, 2, 1], [0, 2, 2], [1, 0, 0], [1, 0, 1], [1, 0, 2], [1, 1, 0], [1, 1, 1], [1, 1, 2], [1, 2, 0], [1, 2, 1], [1, 2, 2], [2, 0, 0], [2, 0, 1], [2, 0, 2], [2, 1, 0], [2, 1, 1], [2, 1, 2], [2, 2, 0], [2, 2, 1], [2, 2, 2]]
     
-    def __init__(self, shape=[54,32,32,32,27], output_activation=nn.softmax):
+    def __init__(self, shape=[54,128,27], output_activation=nn.softmax):
         self.shape = shape
         self.output_activation = output_activation
         self.brain = nn.NeuralNetwork(shape, output_activation=output_activation)
@@ -48,7 +48,7 @@ class NNPlayer(cg.AbstractPlayer):
     def add_score(self, score):
         self.scores.append(score)
 
-def play_game(player_a, player_b, num_games=25):
+def play_game(player_a, player_b, num_games=11):
     game = cg.CompromiseGame(player_a, player_b, 30, 10)
     scores = []
 
@@ -92,13 +92,16 @@ def play_against(population, opponent, num_games, num_opponents):
     return population
 
 if __name__ == "__main__":
-    generations = 10000
-    population_size = 100
-    num_games = 25
-    num_opponents = 3
-    mutation_rate = 0.01
+    generations = 5000
+    population_size = 50
+    num_games = 11
+    num_opponents = 18
+    mutation_rate = 0.05
+    mutation_delta = 0.1
 
     population = ga.generate_population(population_size, NNPlayer)
+
+    opponents = [cg.RandomPlayer(), cg.GreedyPlayer(), cg.SmartGreedyPlayer()]
 
     #game = cg.CompromiseGame(cg.RandomPlayer(), cg.RandomPlayer(), 30, 10)
     #sgp = cg.RandomPlayer()
@@ -109,7 +112,10 @@ if __name__ == "__main__":
 
         random.shuffle(population)
 
-        population = play_against(population, cg.RandomPlayer(), num_games, num_opponents)
+        if random.randint(0,100) <= 70:
+            population = self_play(population, num_games, num_opponents)
+        else:
+            population = play_against(population, random.choice(opponents), num_games, num_opponents)
 
         for player in population:
             player.calc_fitness()
@@ -124,8 +130,8 @@ if __name__ == "__main__":
         
         print(f"Generation: {gen}, Avg Fitness: {avg_fitness}, Avg Games Won: {avg_games}, Max Fitness: {population[0].fitness}, Max Games Won: {population[0].games_won}")
 
-        parents = ga.select_mating_pool(population, len(population)//5)
-        children = ga.crossover(parents, population_size-len(parents), mutation_rate)
+        parents = ga.select_mating_pool(population, len(population)//2)
+        children = ga.crossover(parents, population_size-len(parents), mutation_rate, mutation_delta)
 
         population = np.append(parents, children)
 
