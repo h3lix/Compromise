@@ -78,8 +78,27 @@ class NeuralNetwork:
             Returns:
                 None
         """
-        self.shape = shape
         self.layers = []
+        self.initialise_shape(shape, hidden_activation, output_activation)
+
+    def initialise_shape(self, shape, hidden_activation=relu, output_activation=softmax):
+        """
+        Initialises a set of layers in the specified shape
+
+            Parameters:
+                shape (list): The shape of the neural network e.g. [2,4,3] creates 2 input nodes, 4 hidden nodes and 3 output nodes
+                hidden_activation (function): The activation function to be used throughout the network
+                    default: relu
+                output_activation(function): The activation function to be used for the output
+                    default: softmax
+            Returns:
+                None
+        """
+        self.shape = shape
+        self.hidden_activation = hidden_activation
+        self.output_activation = output_activation
+        self.layers = []
+
         for inputs, neurons in zip(shape, shape[1:]):
             self.layers.append(Layer(inputs, neurons, hidden_activation))
 
@@ -103,12 +122,28 @@ class NeuralNetwork:
         return previous_output
 
     def get_weights(self):
+        """
+        Flattens the networks weights into a 1 dimensional array
+
+                Parameters:
+                    None
+                Returns:
+                    flattened_weights (array): The weights of the network in a 1D array
+        """
         flattened_weights = np.array([])
         for layer in self.layers:
             flattened_weights = np.append(flattened_weights, layer.weights.flatten())
         return flattened_weights
 
     def set_weights(self, weights):
+        """
+        Unflattens a 1 dimensional array of weights into the network
+
+            Parameters:
+                weights (array): A 1D array of weights to be set in the network
+            Returns:
+                None
+        """
         len_expected = len(self.get_weights())
         if len(weights) != len_expected:
             print("Input weights do not match expected length")
@@ -122,12 +157,28 @@ class NeuralNetwork:
             index += size
 
     def get_biases(self):
+        """
+        Flattens the networks biases into a 1 dimensional array
+
+                Parameters:
+                    None
+                Returns:
+                    flattened_biases (array): The biases of the network in a 1D array
+        """
         flattened_biases = np.array([])
         for layer in self.layers:
             flattened_biases = np.append(flattened_biases, layer.biases.flatten())
         return flattened_biases
 
     def set_biases(self, biases):
+        """
+        Unflattens a 1 dimensional array of biases into the network
+
+            Parameters:
+                biases (array): A 1D array of biases to be set in the network
+            Returns:
+                None
+        """
         len_expected = len(self.get_biases())
         if len(biases) != len_expected:
             print("Input biases do not match expected length")
@@ -141,10 +192,29 @@ class NeuralNetwork:
             index += size
 
     def save(self, filename):
-        np.savez(filename, weights=self.get_weights(), biases=self.get_biases())
+        """
+        Saves the neural networks shape, weights and biases to a file
+
+            Parameters:
+                filename (string): Name of file for the model to be saved to
+            Returns:
+                None
+        """
+        np.savez(filename, shape=self.shape,
+                           weights=self.get_weights(), 
+                           biases=self.get_biases())
 
     def load(self, filename):
+        """
+        Loads a saved neural network from a file, including shape, weights and biases
+        
+            Parameters:
+                filename (string): Name of file to load the model from
+            Returns:
+                None
+        """
         with np.load(filename) as model:
+            self.initialise_shape(model['shape'])
             self.set_weights(model['weights'])
             self.set_biases(model['biases'])
 

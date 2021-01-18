@@ -3,7 +3,7 @@ import CompromiseGame as cg
 
 if __name__ == "__main__":
     player = NNPlayer()
-    player.brain.load("best-model.npz")
+    player.brain.load("model-test.npz")
 
     game = cg.CompromiseGame(player, cg.RandomPlayer(), 30, 10)
     wins = 0
