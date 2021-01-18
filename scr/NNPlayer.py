@@ -179,12 +179,13 @@ def play_against(population, opponent, num_games, num_opponents):
     return population
 
 if __name__ == "__main__":
-    generations = 1000
+    generations = 10000
     population_size = 100
-    num_games = 25
+    num_games = 10
     num_opponents = 3
+    max_games = num_games * num_opponents
     mutation_rate = 0.05
-    mutation_delta = 0.5
+    mutation_delta = 1
 
     population = ga.generate_population(population_size, NNPlayer)
 
@@ -199,10 +200,10 @@ if __name__ == "__main__":
 
         random.shuffle(population)
 
-        #if random.randint(0,100) <= 70:
-        #    population = self_play(population, num_games, num_opponents)
-        #else:
-        population = play_against(population, cg.RandomPlayer(), num_games, num_opponents)
+        if random.randint(0,100) <= 40:
+            population = self_play(population, num_games, num_opponents)
+        else:
+            population = play_against(population, random.choice(opponents), num_games, num_opponents)
 
         for player in population:
             player.calc_fitness()
@@ -214,11 +215,15 @@ if __name__ == "__main__":
         avg_games = avg_games/len(population)
 
         population = sorted(population, key=lambda player: player.fitness, reverse=True)
+        max_games_won = population[0].games_won
         
-        print(f"Generation: {gen}, Avg Fitness: {avg_fitness}, Avg Games Won: {avg_games}, Max Fitness: {population[0].fitness}, Max Games Won: {population[0].games_won}")
+        print(f"Generation: {gen}, Avg Fitness: {avg_fitness}, Avg Games Won: {avg_games}, Max Fitness: {population[0].fitness}, Max Games Won: {max_games_won}")
+
+        # Alter mutation intensity based on closeness to maximum solution (i.e. big mutations at start, small when nearing solution)
+        current_mutation_delta = mutation_delta * (1 - (max_games_won / max_games))
 
         parents = ga.select_mating_pool(population, len(population)//2)
-        children = ga.intermediate_recombination(parents, population_size-len(parents), mutation_rate, mutation_delta)
+        children = ga.intermediate_recombination(parents, population_size-len(parents), mutation_rate, current_mutation_delta)
 
         population = np.append(parents, children)
 
