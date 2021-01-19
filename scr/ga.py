@@ -19,6 +19,10 @@ def generate_population(population_size, pop_obj):
     """
     return [pop_obj() for _ in range(population_size)]
 
+def create_mask(weights, rate):
+    # Mask code found here: https://stackoverflow.com/questions/31389481/numpy-replace-random-elements-in-an-array
+    return np.random.choice([0, 1], size=weights.shape, p=((1 - rate), rate)).astype(np.bool)
+
 def scale_fitness(fitness, scale_factor, offset):
     """
     A method to scale fitness values in order to even the playing field for parent selection
@@ -64,148 +68,193 @@ def select_mating_pool(population, num_parents):
     # Randomly select parents based on fitness, higher = more likely to be selected
     # This can result in lower fitness values being picked for gene diversity
     # This sometimes fails due to too many fitness values being negative therefore their probability for being selected is 0
+    # This is negated by fitness scaling to ensure that the range between the highest and lowest fitness is smaller
     fitnesses = get_normalised_fitnesses(population)
     return np.random.choice(population, size=num_parents, replace=False, p=fitnesses)
 
-def single_point_crossover(parents, num_children, mutation_rate, mutation_delta):
+def select_parents(parents, probabilities):
     """
-    A method for breeding children from a set of parents by crossing over weights and biases
+    A method for selecting a number of parents based on a list of probabilities
 
         Parameters:
-            parents (list): A list of potential candidate parents, with a fitness value
-            num_children (int): The numver of children to create
-            mutation_rate (float): The amount of mutation that should occur to child's weights and biases
-            mutation_delta (float): The intensity of mutations
-        Returns
-            children (list): A list of children generated from parents
+            parents (array): An array of parents to choose from
+            probabilities (array): An array of probabilities, must be the same length as parents and add to 1
+        Returns:
+            parent_a (NNPlayer): An instance of NNPlayer 
+            parent_b (NNPlayer): A second instance of NNPlayer
+    """
+    # Select two parents based on the list of probabilities (Scaled fitnesses)
+    # replace=False ensures that parents picked will be different
+    parent_a, parent_b = np.random.choice(parents, size=2, replace=False, p=probabilities)
+    return parent_a, parent_b
+
+def get_weights_and_biases(parent):
+    """
+    A method to quickly retrieve a parents weights and biases
+
+        Parameters:
+            parent (NNPlayer): The NNPlayer to retrieve the weights and biases from
+        Returns:
+            weights (array): The weights of the parent
+            biases (array): The biases of the parent
+    """
+    return parent.brain.get_weights(), parent.brain.get_biases()
+
+def create_child(base, weights, biases):
+    """
+    A method to quickly create a child object
+
+        Parameters:
+            base (Class): The base class to copy from
+            weights (array): The weights to set the child to have
+            biases (array): The biases to set the child to have
+        Returns:
+            child (Class): An instantiation of the 'base' class with the weights and biases parsed
+    """
+    child = base.copy()
+
+    child.brain.set_weights(weights)
+    child.brain.set_biases(biases)
+
+    return child
+
+def create_random_children(base_parent, num_children):
+    """
+    A method to create a set of random children
+
+        Parameters:
+            base_parent (Object): The base object to randomise
+            num_children (int): The amount of children to create
+        Returns:
+            children (array): An array of random children
     """
     children = []
-    probabilities = get_normalised_fitnesses(parents)
-    for _ in range(num_children-1):
-        # Choose two random parents based on their fitness values, higher values = more likely to be picked
-        parent_a, parent_b = np.random.choice(parents, size=2, p=probabilities)
-        
-        # Get the parents weights and biases as a 1D array
-        pa_weights = parent_a.brain.get_weights()
-        pb_weights = parent_b.brain.get_weights()
-
-        pa_biases = parent_a.brain.get_biases()
-        pb_biases = parent_b.brain.get_biases()
-
-        shape = parent_a.brain.shape
-
-        # Create split points for the weights and biases
-        weight_split = random.randint(0, len(pa_weights)-1)
-        biases_split = random.randint(0, len(pa_biases)-1)
-
-        # Combine parent weights and biases at the split points as well as mutate them
-        child_weights = mutate(np.append(pa_weights[:weight_split,], pb_weights[weight_split:,]), mutation_rate, mutation_delta)
-        child_biases = mutate(np.append(pa_biases[:biases_split,], pb_biases[biases_split:,]), mutation_rate, mutation_delta)
-
-        # Create a new child and set its weight and biases and add it to a children list
-        child = parent_a.copy()
-
-        child.brain.set_weights(child_weights)
-        child.brain.set_biases(child_biases)
-
-        children.append(child)
-
-
-    # For gene diversity, create 1 random child in every generation
-    random_child = parents[0].copy()
-    random_child.brain.initialise_shape(random_child.brain.shape, 
-                                        random_child.brain.hidden_activation, 
-                                        random_child.brain.output_activation)
-
-    children.append(random_child)
-
-    return children
-
-def uniform_crossover(parents, num_children, crossover_amount, mutation_rate, mutation_delta):
-    children = []
-    probabilities = get_normalised_fitnesses(parents)
     for _ in range(num_children):
-        parent_a, parent_b = np.random.choice(parents, size=2, p=probabilities)
+        random_child = base_parent.copy()
+        random_child.brain.initialise_shape(random_child.brain.shape, 
+                                            random_child.brain.hidden_activation, 
+                                            random_child.brain.output_activation)
+        children.append(random_child)
+    return children
 
-        a_weights = parent_a.brain.get_weights()
-        a_biases = parent_a.brain.get_biases()
+def crossover(parents, num_children, amount_to_randomise, crossover_func, **kwargs):
+    """
+    A cookie cutter crossover method
 
-        b_weights = parent_a.brain.get_weights()
-        b_biases = parent_a.brain.get_biases()
+        Parameters:
+            parents (array): The parents to crossover into offspring
+            num_children (int): The number of children to create
+            pct_to_randomise (int): Percentage of children that should be completely random
+            crossover_func (function): The function for crossing over weights and biases
+            crossover_rate (float): The rate at which crossover should occur
+        Returns:
+            children (array): An array of children to be added to the population
+    """
+    children = create_random_children(parents[0], amount_to_randomise)
+    probabilities = get_normalised_fitnesses(parents)
 
-        weight_mask = np.random.choice([0, 1], size=a_weights.shape, p=((1 - crossover_amount), crossover_amount)).astype(np.bool)
-        biases_mask = np.random.choice([0, 1], size=a_biases.shape, p=((1 - crossover_amount), crossover_amount)).astype(np.bool)
+    for _ in range(num_children - len(children)):
+        parent_a, parent_b = select_parents(parents, probabilities)
 
-        a_weights[weight_mask] = b_weights[weight_mask]
-        a_biases[biases_mask] = b_biases[biases_mask]
+        pa_weights, pa_biases = get_weights_and_biases(parent_a)
+        pb_weights, pb_biases = get_weights_and_biases(parent_b)
 
-        child_weights = mutate(a_weights, mutation_rate, mutation_delta)
-        child_biases = mutate(a_biases, mutation_rate, mutation_delta)
+        child_weights = crossover_func(pa_weights, pb_weights, **kwargs)
+        child_biases = crossover_func(pa_biases, pb_biases, **kwargs)
 
-        child = parent_a.copy()
-
-        child.set_weights(child_weights)
-        child.set_biases(child_biases)
+        child = create_child(parent_a, child_weights, child_biases)
 
         children.append(child)
 
     return children
 
-def intermediate_recombination(parents, num_children, mutation_rate, mutation_delta, crossover_amount=0.25):
+def single_point_crossover(pa_weights, pb_weights, **kwargs):
+    """
+    A method to perform single point crossover on a set of weights
+
+        Parameters:
+            pa_weights (array): The weights of parent_a
+            pb_weights (array): The weights of parent_b
+        Returns:
+            weights (array): The crossed over weights of pa_weights and pb_weights
+    """
+    # Create split points for the weights
+    split = random.randint(0, len(pa_weights)-1)
+
+    # Combine parent weights at the split point
+    return np.append(pa_weights[:split,], pb_weights[split:,])
+
+def uniform_crossover(pa_weights, pb_weights, crossover_rate=0.5, **kwargs):
+    """
+    A method to perform uniform crossover on a set of weights
+
+        Parameters:
+            pa_weights (array): The weights of parent_a
+            pb_weights (array): The weights of parent_b
+            crossover_rate (float): The rate at which weights should be swapped (can bias towards one parent if wanted)
+                default: 0.5
+        Returns:
+            weights (array): The crossed over weights of pa_weights and pb_weights
+    """
+    # Create an array of zeros and ones to act as a mask to switch weights
+    mask = create_mask(pa_weights, crossover_rate)
+
+    # Swap pa_weights and pb_weights based on mask
+    pa_weights[mask] = pb_weights[mask]
+    return pa_weights
+
+def intermediate_crossover(pa_weights, pb_weights, crossover_rate=0.5, extra_range=0.25, **kwargs):
+    """
+    A method to perform intermediate crossover on a set of weights
+
+        Parameters:
+            pa_weights (array): The weights of parent_a
+            pb_weights (array): The weights of parent_b
+            crossover_rate (float): The rate at which weights will be crossed over as well as extended
+            crossover_intensity (float): The extra range of weights that can be generated
+        Returns:
+            weights (array): The crossed over weights of pa_weights and pb_weights
+    """
     # Intermediate Recombination found here: https://cs.gmu.edu/~sean/book/metaheuristics/Essentials.pdf
-    children = []
-    probabilities = get_normalised_fitnesses(parents)
-    for _ in range(num_children):
-        parent_a, parent_b = np.random.choice(parents, size=2, replace=False, p=probabilities)
+    # Create an array of zeros and ones to act as a mask
+    mask = create_mask(pa_weights, crossover_rate)
 
-        a_weights = parent_a.brain.get_weights()
-        b_weights = parent_b.brain.get_weights()
+    for i in range(len(pa_weights)):
+        # Skip any that the mask disallows
+        if mask[i] == 0:
+            continue
 
-        a_biases = parent_a.brain.get_biases()
-        b_biases = parent_b.brain.get_biases()
+        # Create an alpha value between -p and 1+p where p is the crossover rate
+        alpha = random.uniform(-extra_range, 1 + extra_range)
+        pa_weights[i] = alpha * pa_weights[i] + (1 - alpha) * pb_weights[i]
 
-        weight_mask = np.random.choice([0, 1], size=a_weights.shape, p=((1 - crossover_amount), crossover_amount)).astype(np.bool)
-        biases_mask = np.random.choice([0, 1], size=a_biases.shape, p=((1 - crossover_amount), crossover_amount)).astype(np.bool)
+    return pa_weights
 
-
-        for i in range(len(a_weights)):
-            if weight_mask[i] == 0:
-                continue
-
-            alpha = random.uniform(-crossover_amount, 1+crossover_amount)
-            a_weights[i] = alpha * a_weights[i] + (1 - alpha) * b_weights[i]
-
-        for i in range(len(a_biases)):
-            if biases_mask[i] == 0:
-                continue
-
-            alpha = random.uniform(-crossover_amount, 1+crossover_amount)
-            a_biases[i] = alpha * a_biases[i] + (1 - alpha) * b_biases[i]
-
-        child_weights = mutate(a_weights, mutation_rate, mutation_delta)
-        child_biases = mutate(a_biases, mutation_rate, mutation_delta)
-
-        child = parent_a.copy()
-        child.brain.set_weights(child_weights)
-        child.brain.set_biases(child_biases)
-
-        children.append(child)
-
-    return children
-
-def mutate(weights, mutation_rate, mutation_delta):
+def mutate(children, mutation_rate, mutation_delta):
     """
     A method to mutate a set of weights
 
         Parameters:
-            weights (list): The weights to be mutated
+            children (array): The children to be mutated
             mutation_rate (float): The amount of mutation that should occur to child's weights and biases
             mutation_delta (float): The intensity of mutations
         Returns:
-            weights (list): A mutated list of weights
+            children (array): A mutated list of children
     """
-    # Mask code found here: https://stackoverflow.com/questions/31389481/numpy-replace-random-elements-in-an-array
-    mask = np.random.choice([0, 1], size=weights.shape, p=((1 - mutation_rate), mutation_rate)).astype(np.bool)
-    random_weights = mutation_delta * np.random.uniform(-1,1,*weights.shape)
-    weights[mask] += random_weights[mask]
-    return weights
+    for child in children:
+        weights, biases = get_weights_and_biases(child)
+    
+        weight_mask = create_mask(weights, mutation_rate)
+        biases_mask = create_mask(biases, mutation_rate)
+
+        # Create an array of random numbers between -1 and 1 in the shape of weights & biases
+        random_weights = mutation_delta * np.random.uniform(-1, 1, *weights.shape)
+        random_biases = mutation_delta * np.random.uniform(-1, 1, *biases.shape)
+
+        weights[weight_mask] += random_weights[weight_mask]
+        biases[biases_mask] += random_biases[biases_mask]
+
+        child.brain.set_weights(weights)
+        child.brain.set_biases(biases)
+
+    return children

@@ -179,10 +179,10 @@ def play_against(population, opponent, num_games, num_opponents):
     return population
 
 if __name__ == "__main__":
-    generations = 10000
+    generations = 1000
     population_size = 100
-    num_games = 10
-    num_opponents = 3
+    num_games = 3
+    num_opponents = 10
     max_games = num_games * num_opponents
     mutation_rate = 0.05
     mutation_delta = 1
@@ -200,10 +200,10 @@ if __name__ == "__main__":
 
         random.shuffle(population)
 
-        if random.randint(0,100) <= 40:
-            population = self_play(population, num_games, num_opponents)
-        else:
-            population = play_against(population, random.choice(opponents), num_games, num_opponents)
+        #if random.randint(0,100) <= 40:
+        population = self_play(population, num_games, num_opponents)
+        #else:
+        #population = play_against(population, cg.SmartGreedyPlayer(), num_games, num_opponents)
 
         for player in population:
             player.calc_fitness()
@@ -223,7 +223,8 @@ if __name__ == "__main__":
         current_mutation_delta = mutation_delta * (1 - (max_games_won / max_games))
 
         parents = ga.select_mating_pool(population, len(population)//2)
-        children = ga.intermediate_recombination(parents, population_size-len(parents), mutation_rate, current_mutation_delta)
+        children = ga.crossover(parents, population_size-len(parents), 10, ga.uniform_crossover, crossover_rate=0.5, extra_range=0.25)
+        children = ga.mutate(children, mutation_rate, current_mutation_delta)
 
         population = np.append(parents, children)
 
