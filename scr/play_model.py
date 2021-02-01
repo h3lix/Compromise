@@ -2,11 +2,9 @@ from NNPlayer import NNPlayer
 import CompromiseGame as cg
 
 if __name__ == "__main__":
-    player = NNPlayer()
-    player.brain.load("worst-nn.npz")
+    player = NNPlayer(filename="worst-nn.npz")
 
-    player2 = NNPlayer()
-    player2.brain.load("best-nn.npz")
+    player2 = NNPlayer(filename="best-nn.npz")
 
     game = cg.CompromiseGame(player, player2, 30, 10)
     wins = 0

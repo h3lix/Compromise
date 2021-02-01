@@ -15,7 +15,7 @@ class NNPlayer(cg.AbstractPlayer):
     
     possible_moves = [[0, 0, 0], [0, 0, 1], [0, 0, 2], [0, 1, 0], [0, 1, 1], [0, 1, 2], [0, 2, 0], [0, 2, 1], [0, 2, 2], [1, 0, 0], [1, 0, 1], [1, 0, 2], [1, 1, 0], [1, 1, 1], [1, 1, 2], [1, 2, 0], [1, 2, 1], [1, 2, 2], [2, 0, 0], [2, 0, 1], [2, 0, 2], [2, 1, 0], [2, 1, 1], [2, 1, 2], [2, 2, 0], [2, 2, 1], [2, 2, 2]]
     
-    def __init__(self, shape=[27,64,64,27], hidden_activation=nn.relu, output_activation=nn.softmax):
+    def __init__(self, shape=[27,64,64,27], hidden_activation=nn.relu, output_activation=nn.softmax, filename=None):
         """
         Initialise a NNPlayer with a Neural Network brain
 
@@ -27,6 +27,8 @@ class NNPlayer(cg.AbstractPlayer):
                 None
         """
         self.brain = nn.NeuralNetwork(shape, hidden_activation, output_activation)
+        if filename is not None:
+            self.brain.load(filename)
         self.fitness = 0
         self.games_won = 0
         self.scores = []
