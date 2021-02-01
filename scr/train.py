@@ -49,6 +49,7 @@ def self_play(population, num_games, num_opponents):
         for _ in range(num_opponents):
             random.shuffle(population)
             
+            # zip(*[iter(array)]*n) loops through the array n items at a time
             population = np.array(pool.starmap(play_game, zip(*[iter(population)]*2))).flatten()
 
     return population
