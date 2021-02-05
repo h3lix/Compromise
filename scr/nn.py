@@ -41,7 +41,7 @@ class Layer:
                 None
         """
         self.weights = 0.1 * np.random.randn(num_inputs, num_neurons)
-        self.biases = np.zeros((1, num_neurons))
+        self.biases = 2 * np.random.randn(1, num_neurons)
         self.set_activation(activation_func)
 
     def set_activation(self, activation_func):
@@ -99,6 +99,7 @@ class NeuralNetwork:
         self.output_activation = output_activation
         self.layers = []
 
+        # Loop through each 2 consecutive elements ([2,4,4,3] -> [2,4], [4,4], [4,3])
         for inputs, neurons in zip(shape, shape[1:]):
             self.layers.append(Layer(inputs, neurons, hidden_activation))
 

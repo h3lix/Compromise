@@ -5,6 +5,7 @@ import numpy as np
 import random
 import multiprocessing
 import itertools
+import csv
 
 def play_game(player_a, player_b, num_games=11):
     """
@@ -75,13 +76,16 @@ def play_against(population, opponent, num_games, num_opponents):
     return population
 
 if __name__ == "__main__":
-    generations = 1000
+    generations = 500
     population_size = 100
     num_games = 11
     num_opponents = 10
     max_games = num_games * num_opponents
     mutation_rate = 0.05
     mutation_delta = 1
+
+    csv_header = ['generation', 'avg_fitness', 'avg_games', 'max_fitness', 'max_games']
+    dict_data = []
 
     population = ga.generate_population(population_size, NNPlayer)
 
@@ -97,9 +101,9 @@ if __name__ == "__main__":
         random.shuffle(population)
 
         #if random.randint(0,100) <= 40:
-        population = self_play(population, num_games, num_opponents)
+        #population = self_play(population, num_games, num_opponents)
         #else:
-        #population = play_against(population, cg.SmartGreedyPlayer(), num_games, num_opponents)
+        population = play_against(population, cg.SmartGreedyPlayer(), num_games, num_opponents)
 
         for player in population:
             player.calc_fitness()
@@ -112,18 +116,35 @@ if __name__ == "__main__":
 
         population = sorted(population, key=lambda player: player.fitness, reverse=True)
         max_games_won = population[0].games_won
-        
+
+        dict_data.append({
+            'generation': gen,
+            'avg_fitness': avg_fitness,
+            'avg_games': avg_games,
+            'max_fitness': population[0].fitness,
+            'max_games': max_games_won
+        })
+
         print(f"Generation: {gen}, Avg Fitness: {avg_fitness}, Avg Games Won: {avg_games}, Max Fitness: {population[0].fitness}, Max Games Won: {max_games_won}")
 
         # Alter mutation intensity based on closeness to maximum solution (i.e. big mutations at start, small when nearing solution)
-        #current_mutation_delta = mutation_delta * (1 - (max_games_won / max_games))
-        current_mutation_delta = mutation_delta * (1 - (gen / generations))
+        current_mutation_delta = mutation_delta * (1 - (max_games_won / max_games))
+        #current_mutation_delta = mutation_delta * (1 - (gen / generations))
 
         parents = ga.select_mating_pool(population, len(population)//2)
-        children = ga.crossover(parents, population_size-len(parents), 10, ga.uniform_crossover, crossover_rate=0.5, extra_range=0.25)
+        children = ga.crossover(parents, population_size-len(parents), 10, ga.intermediate_crossover, crossover_rate=0.5, extra_range=0.25)
         children = ga.mutate(children, mutation_rate, current_mutation_delta)
 
         population = np.append(parents, children)
+
+    try:
+        with open("500-smartgreedy.csv", 'w') as csvfile:
+            writer = csv.DictWriter(csvfile, fieldnames=csv_header)
+            writer.writeheader()
+            for data in dict_data:
+                writer.writerow(data)
+    except IOError:
+        print("I/O error")
 
     population = sorted(population, key=lambda player: player.fitness, reverse=True)
     population[0].brain.save("best-nn.npz")
