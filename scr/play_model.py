@@ -1,10 +1,11 @@
 from NNPlayer import NNPlayer
+import Player1817374
 import CompromiseGame as cg
 
 if __name__ == "__main__":
-    player = NNPlayer(filename="200-random-player.npz")
+    player = NNPlayer(filename="1000-self-play-improved.npz")
 
-    player2 = NNPlayer(filename="worst-nn.npz")
+    player2 = Player1817374.NNPlayer()
 
     game = cg.CompromiseGame(player, player2, 30, 10)
     #game = cg.CompromiseGame(player, cg.RandomPlayer(), 30, 10)
